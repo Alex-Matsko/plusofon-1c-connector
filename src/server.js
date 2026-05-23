@@ -15,6 +15,15 @@ function createServer() {
   const app = express();
   app.use(express.json());
 
+  // ── Проверка API-ключа ────────────────────────────────────────────────────
+  function checkApiKey(req, res, next) {
+    const secret = process.env.API_SECRET;
+    if (secret && req.headers['x-api-key'] !== secret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+  }
+
   // ── Health check ──────────────────────────────────────────────────────────
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
@@ -22,8 +31,11 @@ function createServer() {
 
   // ── Инициировать быстрый звонок (из 1С нажата кнопка «Позвонить») ────────
   // POST /quickcall
+  // Headers: X-Api-Key: <API_SECRET>
   // Body: { "number": "79XXXXXXXXX", "line_number": "7XXXXXXXXXX", "sip_id": "optional" }
-  app.post('/quickcall', async (req, res) => {
+  // Plusofon перезвонит на line_number (внутр./мобильный менеджера),
+  // а затем соединит его с number (клиент).
+  app.post('/quickcall', checkApiKey, async (req, res) => {
     const { number, line_number, sip_id } = req.body;
 
     if (!number || !line_number) {
@@ -47,7 +59,7 @@ function createServer() {
           timeout: 10_000,
         }
       );
-      logger.info(`quickcall initiated to ${number}`);
+      logger.info(`quickcall initiated to ${number} via ${line_number}`);
       return res.json(resp.data);
     } catch (err) {
       logger.error('quickcall error', err.response?.data || err.message);
