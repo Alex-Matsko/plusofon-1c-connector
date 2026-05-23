@@ -6,12 +6,24 @@
 'use strict';
 
 const axios = require('axios');
+const qs = require('qs');
 const db = require('./db');
 const logger = require('./logger');
 const { normPhone } = require('./utils');
 
 const PLUSOFON_BASE = 'https://restapi.plusofon.ru';
 const INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_SEC || '30', 10) * 1000;
+
+const COLUMNS = [
+  'connect_time',
+  'number_a',
+  'number_b',
+  'cld',
+  'direction',
+  'duration',
+  'account',
+  'record',
+];
 
 /**
  * Один цикл опроса.
@@ -38,9 +50,12 @@ async function poll() {
           date_from: formatDate(lastSync),
           date_to: formatDate(now),
           direction: 'all',
-          columns: ['connect_time', 'number_a', 'number_b', 'cld', 'direction', 'duration', 'account', 'record'],
+          'columns[]': COLUMNS,
           page,
         },
+        // Plusofon ожидает columns[]=value&columns[]=value (не columns[0]=value)
+        paramsSerializer: (params) =>
+          qs.stringify(params, { arrayFormat: 'repeat' }),
       });
     } catch (err) {
       logger.error('Plusofon API error', err.message);
